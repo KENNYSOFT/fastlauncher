@@ -1,4 +1,4 @@
-fastlaunch
+fastlauncher
 ==============================
 fastlaunch is a ~~poorly written~~ command line based launcher.
 
