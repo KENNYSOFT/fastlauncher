@@ -13,4 +13,6 @@ Setup
 
 "Compilation"
 ------------------------------
+* Run `pip3 install pyinstaller` or get pyinstaller somehow
 * Run `pyinstaller -F fastlauncher.py`
+* Your executable is in `dist/`
