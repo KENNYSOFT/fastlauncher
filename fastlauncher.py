@@ -25,7 +25,7 @@ CLIENT_ID = "7853644408"
 SCOPE = "us.launcher.all"
 AUTO_LOGIN = False
 CAPTCHA_TOKEN = "0xDEADBEEF"
-PRODUCT_ID = "10200"
+PRODUCT_ID = "10100"
 REMEMBER_ME = True
 
 WEBAPI_BASE_URL = "https://www.nexon.com/account-webapi/"
@@ -43,8 +43,8 @@ LOGIN_URL = WEBAPI_BASE_URL + "login/launcher"
 VERIFY_URL = WEBAPI_BASE_URL + "trusted_devices"
 
 LAUNCHER_NAME = "fastlauncher"
-VER = "0.1.0"
-CODENAME = "smallwhale"
+VER = "0.1.0-GMSDL"
+CODENAME = "SECRET"
 
 CONFIGURATION_PATH = os.environ['APPDATA']  + '\\' + LAUNCHER_NAME + '\\configuration.json'
 
@@ -183,78 +183,6 @@ class login_instance(object):
         response = requests.get(MANIFEST_HASH_URL, headers=headers)
         
         return response
-    
-    def get_metadata_response(self):
-        
-        # Construct headers
-        headers = {
-            "Content-Type" : "application/json",
-            "Authorization" : "Bearer {access_token}".format(access_token=self.access_token)
-        }
-        
-        response = requests.get(METADATA_URL, headers=headers)
-        
-        return response
-    
-    def check_playable_response(self):
-        
-        # Construct headers
-        headers = {
-            "Content-Type" : "application/json"
-        }
-        
-        json_dict = {
-            "product_id" : PRODUCT_ID,
-            "id_token" : self.id_token,
-            "device_id" : self.device_id
-        }
-        
-        response = requests.post(PLAYABLE_URL, json=json_dict, headers=headers)
-        
-        return response
-    
-    def get_passport_response(self):
-        
-        # Construct headers
-        headers = {
-            "Content-Type" : "application/json",
-            "Authorization" : "Bearer {access_token}".format(access_token=self.access_token)
-        }
-        
-        # Construct json
-        json_dict = {
-            "product_id" : PRODUCT_ID
-        }
-        
-        response = requests.post(PASSPORT_URL, json=json_dict, headers=headers)
-        
-        return response
-    
-    def launch(self, client_path):
-        metadata_response = self.get_metadata_response()
-        metadata_response_json = json.loads(metadata_response.text)
-        if metadata_response.ok:
-            parameters = metadata_response_json["parameter"]
-
-            playable_response = self.check_playable_response()
-
-            # Needs to check if playable or passport will spit out invalid token
-            if playable_response.ok:
-                passport_response = self.get_passport_response()
-                passport_response_json = json.loads(passport_response.text)
-
-                if passport_response.ok:
-                    passport = passport_response_json["passport"]
-                    parameters[-2] = "/P:"+ passport
-                    cwd, _ = os.path.split(client_path)
-                    parameters.remove('-NXAL')
-
-                    client = subprocess.Popen([client_path] + parameters, cwd=cwd, shell=True)
-                    
-                    if not isinstance(client.poll(), int):
-                        return True
-                    else:
-                        return False
 
 class launcher(object):
     
@@ -283,18 +211,9 @@ class launcher(object):
                     import_configuration_path = filedialog.askopenfilename()
                     if import_configuration_path:
                         self.configuration = self.read_configuration(CONFIGURATION_PATH)
-                else:
-                    print("Getting path to client.exe...")
-                    getting_client = True
-                    while getting_client:
-                        client_path = filedialog.askopenfilename()
-                        if client_path:
-                            getting_client = False
-                        else:
-                            print("No valid client path found, please try again")
 
                 print("Creating configuration file...")
-                self.create_configuration(client_path)
+                self.create_configuration()
             else:
                 self.configuration = self.read_configuration(CONFIGURATION_PATH)
         if not self.configuration['users']:
@@ -307,7 +226,7 @@ class launcher(object):
         while in_menu:
             print("Please press the number for the account to login or letter for other options, then press enter")
             user_dictionary = self.list_users()
-            print("C - new account, U - update password, Q - change path to client.exe, D - delete account, E - exit")
+            print("C - new account, U - update password, D - delete account, E - exit")
             user_input = input("Your selection: ").lower()
             if user_input == "c":
                 self.create_user_profile()
@@ -339,8 +258,6 @@ class launcher(object):
                         print(user_input + " is not a valid input, please try again")
             elif user_input == "e":
                 sys.exit()
-            elif user_input == "q":
-                self.update_client_path()
             elif user_input in user_dictionary.keys():
                 hashed_username = user_dictionary[user_input]
                 self.login_and_launch(self.configuration['users'][hashed_username]['username'], self.configuration['users'][hashed_username]['hashed_password'], self.configuration['users'][hashed_username]['device_id'])
@@ -359,18 +276,12 @@ class launcher(object):
     def login_and_launch(self, username, hashed_password, device_id):
         instance = login_instance()
         logged_in = False
-        launched = False
         update_config = False
         while not logged_in:
             login_attempt = instance.login(username=username, hashed_password=hashed_password, device_id=device_id)
             if login_attempt == 0:
                 logged_in = True
-                while not launched:
-                    if os.path.exists(self.configuration['client_path']) and instance.launch(self.configuration['client_path']):
-                        launched = True
-                    else:
-                        if not query_yes_no("Launch failed, try again?"):
-                            return False
+                print(json.loads(instance.get_manifest_hash_url_response().text)["manifestUrl"])
             elif login_attempt == 1:
                 username = input("Username : ")
                 instance.login(username, hashed_password, device_id)
@@ -418,15 +329,9 @@ class launcher(object):
             data = json.load(config_file)
         return data
 
-    def create_configuration(self, client_path):
-        self.configuration = {'client_path': client_path, 'users' : {}}
+    def create_configuration(self):
+        self.configuration = {'users' : {}}
         self.flush_to_configuration_file()
-
-    def update_client_path(self):
-        client_path = filedialog.askopenfilename()
-        if client_path:
-            self.configuration['client_path'] = client_path
-            self.flush_to_configuration_file()
 
     def create_user_profile(self, first_user=False):
         print("Creating user...")
