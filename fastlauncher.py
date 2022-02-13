@@ -15,6 +15,7 @@ import os
 import secrets
 import tkinter as tk
 from tkinter import filedialog
+import time
 
 yes = {'yes','y', 'ye', ''}
 no = {'no','n'}
@@ -28,14 +29,14 @@ CAPTCHA_TOKEN = "0xDEADBEEF"
 PRODUCT_ID = "10100"
 REMEMBER_ME = True
 
-WEBAPI_BASE_URL = "https://www.nexon.com/account-webapi/"
-API_NEXON_BASE_URL = "https://api.nexon.io/"
+WEBAPI_BASE_URL = "https://www.nexon.com/api/account/v1/no-auth/"
+API_NEXON_BASE_URL = "https://www.nexon.com/api/"
 NXL_DOWNLOAD_BASE_URL = "https://download2.nexon.net/Game/nxl/games"
 
 NXL_DOWNLOAD_URL = NXL_DOWNLOAD_BASE_URL + "/" + PRODUCT_ID
 NXL_DOWNLOAD_PARTS_URL = NXL_DOWNLOAD_URL + "/" + PRODUCT_ID
-METADATA_URL = API_NEXON_BASE_URL + "game-info/v2/games/" + PRODUCT_ID
-MANIFEST_HASH_URL = METADATA_URL + "/branch/public" 
+METADATA_URL = API_NEXON_BASE_URL + "game-build/v1/branch/games/" + PRODUCT_ID
+MANIFEST_HASH_URL = METADATA_URL + "/public" 
 PLAYABLE_URL = API_NEXON_BASE_URL + "game-auth/v2/check-playable"
 PASSPORT_URL = API_NEXON_BASE_URL + "passport/v1/passport"
 
@@ -43,8 +44,8 @@ LOGIN_URL = WEBAPI_BASE_URL + "login/launcher"
 VERIFY_URL = WEBAPI_BASE_URL + "trusted_devices"
 
 LAUNCHER_NAME = "fastlauncher"
-VER = "0.1.0-GMSDL"
-CODENAME = "SECRET"
+VER = "0.1.1-GMSDL"
+CODENAME = "CODE"
 
 CONFIGURATION_PATH = os.environ['APPDATA']  + '\\' + LAUNCHER_NAME + '\\configuration.json'
 
@@ -77,8 +78,7 @@ class login_instance(object):
     def __init__(self):
         
         self.device_id = None
-        self.id_token = None
-        self.access_token = None
+        self.NxLSession = None
         self.manifest_url = None
     
     def login(self, username=None, hashed_password=None, device_id=None):
@@ -120,13 +120,12 @@ class login_instance(object):
                 return 5
         else:
             logged_in = True
-            self.id_token = login_response_json["id_token"]
-            self.access_token = login_response_json['access_token']
+            self.NxLSession = login_response.cookies["NxLSession"]
             return 0
 
     def get_login_response(self, password):
         """
-        Post and get the login response which includes the id_token and access_token.
+        Post and get the login response which includes the NxLSession.
         """
         
         # Construct headers
@@ -138,11 +137,11 @@ class login_instance(object):
         json_dict = {
             "id" : self.username,
             "password" : password,
-            "auto_login" : AUTO_LOGIN,
-            "client_id" : CLIENT_ID,
+            "clientId" : CLIENT_ID,
             "scope" : SCOPE,
-            "device_id" : self.device_id,
-            "captcha_token" : CAPTCHA_TOKEN
+            "deviceId" : self.device_id,
+            "captchaToken" : CAPTCHA_TOKEN,
+            "localTime": int(time.time())
         }
 
         response = requests.post(LOGIN_URL, json=json_dict, headers=headers)
@@ -177,7 +176,7 @@ class login_instance(object):
         # Construct headers
         headers = {
             "Content-Type" : "application/json",
-            "Authorization" : "Bearer {access_token}".format(access_token=self.access_token)
+            "Cookie" : "NxLSession={NxLSession}".format(NxLSession=self.NxLSession)
         }
         
         response = requests.get(MANIFEST_HASH_URL, headers=headers)
